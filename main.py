@@ -258,8 +258,9 @@ def main(players, training=True):
             if player.alive:
                 player.draw(SCREEN)
                 alive+=1
-        if alive==0:       
-            pygame.time.delay(2000)
+        if alive==0:
+            if not training:
+                pygame.time.delay(2000)
             menu(death_count)
         cloud.draw(SCREEN)
         cloud.update()
