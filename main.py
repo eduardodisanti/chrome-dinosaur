@@ -110,6 +110,8 @@ class Dinosaur:
         if self.jump_vel < -self.JUMP_VEL:
             self.dino_jump = False
             self.jump_vel = self.JUMP_VEL
+            self.Y_POS = 310
+            self.dino_rect.y = self.Y_POS
 
     def draw(self, SCREEN):
         SCREEN.blit(self.image, (self.dino_rect.x, self.dino_rect.y))
@@ -166,7 +168,7 @@ class Bird(Obstacle):
     def __init__(self, image):
         self.type = 0
         super().__init__(image, self.type)
-        self.rect.y = 220 #250
+        self.rect.y = np.random.choice([220, 250])
         self.index = 0
 
     def draw(self, SCREEN):
@@ -270,8 +272,9 @@ def main(players, training=True, random_actions=False):
         if len(obstacles)>0:
             environment[3] = obstacles[0].rect.x
             environment[4] = obstacles[0].rect.y
-            environment[5] = game_speed
-            environment[6] = obstacle.type
+            environment[5] = obstacles[0].rect.w
+            environment[5] = obstacles[0].rect.h
+            environment[6] = obstacles[0].type
 
         for player in players:
             if player.alive:
@@ -299,7 +302,9 @@ def main(players, training=True, random_actions=False):
         for player in players:
             player_score(player)
         score()
+        
         clock.tick(game_speed)
+        
         pygame.display.update()
 
 def menu(death_count, players, training=True, random_actions=False):
@@ -332,7 +337,7 @@ def menu(death_count, players, training=True, random_actions=False):
                 if event.type == pygame.KEYDOWN:
                     main()
 
-def performCrossing(father, mother,  mutation_rate=0.01):
+def performCrossing(father, mother,  mutation_rate=0.05):
     
     size = father.shape[0]
     new_individual = np.zeros(size)
@@ -348,7 +353,7 @@ def performCrossing(father, mother,  mutation_rate=0.01):
             
     return new_individual
 
-def perform_Crossing(father, mother,  mutation_rate=0.01):
+def perform_Crossing(father, mother,  mutation_rate=0.07):
         """ CROSS TWO INDIVIDUALS WITH CROSS OVER STRATEGY, PERFORM MUTATION WHILE CROSSING """
 
         size = father.shape[0]
@@ -362,7 +367,7 @@ def perform_Crossing(father, mother,  mutation_rate=0.01):
 
         return new_individual
         
-def evolve(players, num_parents=4, mutation_prob=0.05):
+def evolve(players, num_parents=4):
 
     rewards = []
     
@@ -370,41 +375,28 @@ def evolve(players, num_parents=4, mutation_prob=0.05):
         rewards.append(p.points)
     
     parents = np.argsort(rewards)[-num_parents:]
-    father = players[parents[-1]].ANN.get_params()
-    mother = players[parents[-2]].ANN.get_params()
     
     print(rewards[parents[-1]], rewards[parents[-2]])
     
     for p in players:
-        #params = p.ANN.get_params()
+        the_father, the_mother = random.choices(parents, k=2)
+        father = players[the_father].ANN.get_params()
+        mother = players[the_mother].ANN.get_params()
+
         new_individual = performCrossing(father, mother)
         p.ANN.set_params(new_individual)
-        
-    """
-    num_params = p.ANN.get_params().shape[0]
-    
-    N = np.random.randn(population_size, num_params) ### MUTATION BASIS
-    R = [params + sigma * N[j] for j in range(population_size)]
-    R = np.array(R)
-    m = R.mean()
-    s = R.std()
-    A = (R - m) / s
-        
-    new_params = params + learning_rate / (population_size * sigma) * np.dot(N.T, A)
-    """
     
     return players
 
 training = True
-state_dim   = 7
+state_dim   = 8
 generations = 0
 num_players = 10
 D           = state_dim
 M1          = 32
-M2          = 64
+M2          = 16
 K           = 3
 action_max  = 2
-
 
 num_parents = 4
 
@@ -419,7 +411,7 @@ while training:
     action_map = {0:0, 1:0, 2:0}
     generations += 1
     menu(death_count=0, players=players, random_actions=False, training=True)
-    players = evolve(players)
+    players = evolve(players, num_parents=3)
     for p in players:
         p.alive = True
         p.points = 0
