@@ -168,7 +168,7 @@ class Bird(Obstacle):
     def __init__(self, image):
         self.type = 0
         super().__init__(image, self.type)
-        self.rect.y = np.random.choice([220, 250])
+        self.rect.y = np.random.choice([200, 210, 220, 230,240,250])
         self.index = 0
 
     def draw(self, SCREEN):
@@ -272,9 +272,9 @@ def main(players, training=True, random_actions=False):
         if len(obstacles)>0:
             environment[3] = obstacles[0].rect.x
             environment[4] = obstacles[0].rect.y
-            environment[5] = obstacles[0].rect.w
-            environment[5] = obstacles[0].rect.h
-            environment[6] = obstacles[0].type
+            #environment[5] = obstacles[0].rect.h #game_speed
+            #environment[6] = obstacles[0].rect.w
+            environment[7] = obstacles[0].type
 
         for player in players:
             if player.alive:
@@ -337,7 +337,7 @@ def menu(death_count, players, training=True, random_actions=False):
                 if event.type == pygame.KEYDOWN:
                     main()
 
-def performCrossing(father, mother,  mutation_rate=0.05):
+def performCrossing(father, mother,  mutation_rate=0.1):
     
     size = father.shape[0]
     new_individual = np.zeros(size)
@@ -347,7 +347,7 @@ def performCrossing(father, mother,  mutation_rate=0.05):
         if np.random.random()<inherit_prob:
             new_individual[i] = father[i]
         else:
-            new_individual[i] = mother[i]
+            new_individual[i] = mother[i]        
         if np.random.random() < mutation_rate:
             new_individual[i]*=np.random.rand() * 0.1
             
@@ -367,23 +367,32 @@ def perform_Crossing(father, mother,  mutation_rate=0.07):
 
         return new_individual
         
-def evolve(players, num_parents=4):
+def evolve(players, evolution_pool, num_parents=4, mutation_rate=0.1):
 
     rewards = []
     
     for p in players:
         rewards.append(p.points)
     
+    father_reward, last_father = evolution_pool[0]
+    mother_reward, last_mother = evolution_pool[1]
+    
     parents = np.argsort(rewards)[-num_parents:]
     
-    print(rewards[parents[-1]], rewards[parents[-2]])
+    father = players[parents[-1]].ANN.get_params()
+    mother = players[parents[-2]].ANN.get_params()
     
+    
+    #if best_genes[-1] > sorted(rewards)
+    
+    print(rewards[parents[-1]], rewards[parents[-2]])
     for p in players:
-        the_father, the_mother = random.choices(parents, k=2)
+        """
+        the_father, the_mother = random.sample(list(parents), k=2)
         father = players[the_father].ANN.get_params()
         mother = players[the_mother].ANN.get_params()
-
-        new_individual = performCrossing(father, mother)
+        """
+        new_individual = performCrossing(father, mother, mutation_rate=mutation_rate)
         p.ANN.set_params(new_individual)
     
     return players
@@ -391,14 +400,17 @@ def evolve(players, num_parents=4):
 training = True
 state_dim   = 8
 generations = 0
-num_players = 10
+num_players = 50
 D           = state_dim
 M1          = 32
 M2          = 16
 K           = 3
 action_max  = 2
 
-num_parents = 4
+num_parents = 2
+lr = 0.05
+
+evolution_pool = [[0, 0], [0, 0]]
 
 players = []
 for _ in range(num_players):
@@ -411,8 +423,11 @@ while training:
     action_map = {0:0, 1:0, 2:0}
     generations += 1
     menu(death_count=0, players=players, random_actions=False, training=True)
-    players = evolve(players, num_parents=3)
+    players = evolve(players, evolution_pool, num_parents=num_parents, mutation_rate=lr)
+    lr*=0.99
+    if lr<0.03:
+        lr = 0.03
     for p in players:
         p.alive = True
         p.points = 0
-    print(action_map)
+    print(action_map, lr)
