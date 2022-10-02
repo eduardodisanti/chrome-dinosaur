@@ -42,7 +42,6 @@ class Dinosaur:
     
     def set_ANN(self, NN):
         self.ANN = NN
-    
 
     def __init__(self):
         self.duck_img = DUCKING
@@ -60,6 +59,7 @@ class Dinosaur:
         self.dino_rect.x = self.X_POS
         self.dino_rect.y = self.Y_POS
         self.alive = True
+        self.points = 0
 
     def update(self, userInput, action=99):
         if self.dino_duck:
@@ -175,15 +175,28 @@ class Bird(Obstacle):
         SCREEN.blit(self.image[self.index//5], self.rect)
         self.index += 1
 
-def sample_action(dyno):
+def sample_action(env, dyno, random_action):
     
-    action = int(np.random.normal(2))
+    if not random_action:
+        model = dyno.ANN
+        
+        state = np.zeros(env.shape[0])
+        state    = env
+        state[2] = dyno.dino_duck
+        state[3] = dyno.dino_run
+        state[4] = dyno.dino_jump
+        
+        action = np.argmax(model.forward(state))
+    else:
+        action = np.random.randint(3)
+        
     return action
 
-def main(players, training=True):
+def main(players, training=True, random_actions=False):
     
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations
-        
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map
+    
+    environment = np.zeros(5)
     run = True
     clock = pygame.time.Clock()
     
@@ -196,8 +209,14 @@ def main(players, training=True):
     obstacles = []
     death_count = 0
 
+    def player_score(player):
+       
+        if player.alive:
+            player.points+=1
+
     def score():
         global points, game_speed, generations
+        
         points += 1
         if points % 100 == 0:
             game_speed += 1
@@ -223,34 +242,44 @@ def main(players, training=True):
             if event.type == pygame.QUIT:
                 run = False
 
+        if len(obstacles) == 0: # or len(obstacles) > 0 and len(obstacles) < 2 and np.random.randint(10) < 2
+            if random.randint(0, 2) == 0:
+                obstacles.append(SmallCactus(SMALL_CACTUS))
+            elif random.randint(0, 2) == 1:
+                obstacles.append(LargeCactus(LARGE_CACTUS))
+            elif random.randint(0, 2) == 2:
+                obstacles.append(Bird(BIRD))
+    
+        i = 0
+        environment = np.zeros(5, dtype=np.int8)
+        SCREEN.fill((255, 255, 255))
+        for obstacle in obstacles:
+            obstacle.draw(SCREEN)
+            obstacle.update()
+            i+=1
+            for player in players:
+                if player.alive:
+                    if player.dino_rect.colliderect(obstacle.rect):
+                        death_count += 1
+                        player.alive = False
+                        player.kill()
+                        if not training:
+                            pygame.time.delay(2000)
+                            run = False
+
+        if len(obstacles)>0:
+            environment[0] = obstacles[0].rect.centerx
+            environment[1] = obstacles[0].rect.centery
+
         for player in players:
-            SCREEN.fill((255, 255, 255))
-            userInput = pygame.key.get_pressed()
-            if training:
-                action = sample_action(player)
-            else:
-                action = 99
-
-            player.update(userInput, action)
-
-            if len(obstacles) == 0:
-                if random.randint(0, 2) == 0:
-                    obstacles.append(SmallCactus(SMALL_CACTUS))
-                elif random.randint(0, 2) == 1:
-                    obstacles.append(LargeCactus(LARGE_CACTUS))
-                elif random.randint(0, 2) == 2:
-                    obstacles.append(Bird(BIRD))
-
-            for obstacle in obstacles:
-                obstacle.draw(SCREEN)
-                obstacle.update()
-                if player.dino_rect.colliderect(obstacle.rect):
-                    death_count += 1
-                    player.alive = False
-                    player.kill()
-                    if not training:
-                        pygame.time.delay(2000)
-                        menu(death_count)
+            if player.alive:
+                userInput = pygame.key.get_pressed()
+                if training:
+                    action = sample_action(environment, player, random_action=random_actions)
+                    action_map[action]+=1
+                else:
+                    action = 99
+                player.update(userInput, action)
 
         background()
         alive = 0
@@ -261,31 +290,26 @@ def main(players, training=True):
         if alive==0:
             if not training:
                 pygame.time.delay(2000)
-            menu(death_count)
+            run = False
         cloud.draw(SCREEN)
         cloud.update()
 
+        for player in players:
+            player_score(player)
         score()
-
-        clock.tick(30)
+        clock.tick(game_speed)
         pygame.display.update()
 
-def menu(death_count, num_players=10, training=True):
-    global points, generations
-    
-    generations += 1
-    players = []
-    for _ in range(num_players):
-        d = Dinosaur()
-        players.append(d)
+def menu(death_count, players, training=True, random_actions=False):
+    #global points, generations
 
-    run = True
-    while run:
+    #run = True
+    #while run:
         SCREEN.fill((255, 255, 255))
         font = pygame.font.Font('freesansbold.ttf', 30)
 
         if training:
-            main(players)
+            main(players, training=True, random_actions=random_actions)
         else:
             if death_count == 0:
                 text = font.render("Press any Key to Start", True, (0, 0, 0))
@@ -306,6 +330,93 @@ def menu(death_count, num_players=10, training=True):
                 if event.type == pygame.KEYDOWN:
                     main()
 
+def performCrossing(father, mother,  mutation_rate=0.01):
+    
+    size = father.shape[0]
+    new_individual = np.zeros(size)
+    
+    inherit_prob = 0.5
+    for i in range(size):
+        if np.random.random()<inherit_prob:
+            new_individual[i] = father[i]
+        else:
+            new_individual[i] = mother[i]
+        if np.random.random() < mutation_rate:
+            new_individual[i]*=np.random.rand() * 0.1
+            
+    return new_individual
 
+def perform_Crossing(father, mother,  mutation_rate=0.01):
+        """ CROSS TWO INDIVIDUALS WITH CROSS OVER STRATEGY, PERFORM MUTATION WHILE CROSSING """
+
+        size = father.shape[0]
+        new_individual = np.zeros(size)
+        midPoint = np.random.randint(0, size)
+        for ix in range(size):
+            if np.random.random(1)[0] < mutation_rate:
+                new_individual[ix] = np.random.randint(1, size=(size))[0]
+            else:
+                new_individual[ix] = father[ix] if ix < midPoint else mother[ix]
+
+        return new_individual
+        
+def evolve(players, num_parents=4, mutation_prob=0.05):
+
+    rewards = []
+    
+    for p in players:
+        rewards.append(p.points)
+    
+    parents = np.argsort(rewards)[-num_parents:]
+    father = players[parents[-1]].ANN.get_params()
+    mother = players[parents[-2]].ANN.get_params()
+    
+    print(rewards[parents[-1]], rewards[parents[-2]])
+    
+    for p in players:
+        #params = p.ANN.get_params()
+        new_individual = performCrossing(father, mother)
+        p.ANN.set_params(new_individual)
+        
+    """
+    num_params = p.ANN.get_params().shape[0]
+    
+    N = np.random.randn(population_size, num_params) ### MUTATION BASIS
+    R = [params + sigma * N[j] for j in range(population_size)]
+    R = np.array(R)
+    m = R.mean()
+    s = R.std()
+    A = (R - m) / s
+        
+    new_params = params + learning_rate / (population_size * sigma) * np.dot(N.T, A)
+    """
+    
+    return players
+
+training = True
 generations = 0
-menu(death_count=0)
+num_players = 10
+D           = 5
+M1          = 32
+M2          = 64
+K           = 3
+action_max  = 2
+
+num_parents = 4
+
+players = []
+for _ in range(num_players):
+    d = Dinosaur()
+    nn = ANN2(D, M1, M2, K, action_max)
+    nn.init()
+    d.set_ANN(nn)
+    players.append(d)
+while training:
+    action_map = {0:0, 1:0, 2:0}
+    generations += 1
+    menu(death_count=0, players=players, random_actions=False, training=True)
+    players = evolve(players)
+    for p in players:
+        p.alive = True
+        p.points = 0
+    print(action_map)
