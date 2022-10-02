@@ -76,11 +76,11 @@ class Dinosaur:
             self.dino_duck = False
             self.dino_run = False
             self.dino_jump = True
-        elif (action==2 or userInput[pygame.K_DOWN]) and not self.dino_jump:
+        elif (action==0 or userInput[pygame.K_DOWN]) and not self.dino_jump:
             self.dino_duck = True
             self.dino_run = False
             self.dino_jump = False
-        elif not (self.dino_jump or userInput[pygame.K_DOWN] or action==0):
+        elif not (self.dino_jump or userInput[pygame.K_DOWN]):
             self.dino_duck = False
             self.dino_run = True
             self.dino_jump = False
@@ -107,7 +107,7 @@ class Dinosaur:
         if self.dino_jump:
             self.dino_rect.y -= self.jump_vel * 4
             self.jump_vel -= 0.8
-        if self.jump_vel < - self.JUMP_VEL:
+        if self.jump_vel < -self.JUMP_VEL:
             self.dino_jump = False
             self.jump_vel = self.JUMP_VEL
 
@@ -166,7 +166,7 @@ class Bird(Obstacle):
     def __init__(self, image):
         self.type = 0
         super().__init__(image, self.type)
-        self.rect.y = 250
+        self.rect.y = 220 #250
         self.index = 0
 
     def draw(self, SCREEN):
@@ -182,9 +182,9 @@ def sample_action(env, dyno, random_action):
         
         state = np.zeros(env.shape[0])
         state    = env
-        state[2] = dyno.dino_duck
-        state[3] = dyno.dino_run
-        state[4] = dyno.dino_jump
+        state[0] = dyno.dino_duck
+        state[1] = dyno.dino_run
+        state[2] = dyno.dino_jump
         
         action = np.argmax(model.forward(state))
     else:
@@ -194,9 +194,9 @@ def sample_action(env, dyno, random_action):
 
 def main(players, training=True, random_actions=False):
     
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map, state_dim
     
-    environment = np.zeros(5)
+    environment = np.zeros(state_dim, dtype=np.int16)
     run = True
     clock = pygame.time.Clock()
     
@@ -251,7 +251,7 @@ def main(players, training=True, random_actions=False):
                 obstacles.append(Bird(BIRD))
     
         i = 0
-        environment = np.zeros(5, dtype=np.int8)
+        environment = np.zeros(state_dim, dtype=np.int16)
         SCREEN.fill((255, 255, 255))
         for obstacle in obstacles:
             obstacle.draw(SCREEN)
@@ -268,8 +268,10 @@ def main(players, training=True, random_actions=False):
                             run = False
 
         if len(obstacles)>0:
-            environment[0] = obstacles[0].rect.centerx
-            environment[1] = obstacles[0].rect.centery
+            environment[3] = obstacles[0].rect.x
+            environment[4] = obstacles[0].rect.y
+            environment[5] = game_speed
+            environment[6] = obstacle.type
 
         for player in players:
             if player.alive:
@@ -394,13 +396,15 @@ def evolve(players, num_parents=4, mutation_prob=0.05):
     return players
 
 training = True
+state_dim   = 7
 generations = 0
 num_players = 10
-D           = 5
+D           = state_dim
 M1          = 32
 M2          = 64
 K           = 3
 action_max  = 2
+
 
 num_parents = 4
 
