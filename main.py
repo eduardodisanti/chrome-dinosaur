@@ -168,7 +168,7 @@ class Bird(Obstacle):
     def __init__(self, image):
         self.type = 0
         super().__init__(image, self.type)
-        self.rect.y = np.random.choice([200, 210, 220, 230,240,250])
+        self.rect.y = np.random.choice([200, 250])
         self.index = 0
 
     def draw(self, SCREEN):
@@ -196,7 +196,7 @@ def sample_action(env, dyno, random_action):
 
 def main(players, training=True, random_actions=False):
     
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map, state_dim
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map, state_dim, alive
     
     environment = np.zeros(state_dim, dtype=np.int16)
     run = True
@@ -217,16 +217,17 @@ def main(players, training=True, random_actions=False):
             player.points+=1
 
     def score():
-        global points, game_speed, generations
+        global points, game_speed, generations, alive
         
         points += 1
         if points % 100 == 0:
             game_speed += 1
 
-        text = font.render("Points: " + str(points) + " Generations " + str(generations), True, (0, 0, 0))
+        text = font.render("Points: " + str(points) + " alive: " + str(alive) + " Generation: " + str(generations), True, (0, 0, 0))
 
         textRect = text.get_rect()
         textRect.center = (900, 40)
+        
         SCREEN.blit(text, textRect)
 
     def background():
@@ -240,6 +241,7 @@ def main(players, training=True, random_actions=False):
         x_pos_bg -= game_speed
 
     while run:
+        alive = 0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -268,6 +270,8 @@ def main(players, training=True, random_actions=False):
                         if not training:
                             pygame.time.delay(2000)
                             run = False
+                else:
+                    alive+=1
 
         if len(obstacles)>0:
             environment[3] = obstacles[0].rect.x
@@ -402,7 +406,7 @@ state_dim   = 8
 generations = 0
 num_players = 50
 D           = state_dim
-M1          = 32
+M1          = 64
 M2          = 16
 K           = 3
 action_max  = 2
@@ -424,10 +428,12 @@ while training:
     generations += 1
     menu(death_count=0, players=players, random_actions=False, training=True)
     players = evolve(players, evolution_pool, num_parents=num_parents, mutation_rate=lr)
-    lr*=0.99
-    if lr<0.03:
-        lr = 0.03
+    lr*=0.91
+    if lr<0.01:
+        lr = 0.01
+    alive = 0
     for p in players:
         p.alive = True
         p.points = 0
+        alive+=1
     print(action_map, lr)
