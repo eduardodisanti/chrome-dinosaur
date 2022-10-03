@@ -1,3 +1,10 @@
+##########################################################
+## ORIGINAL GAME IMPLEMENTED WITH PYGAME BY:            ##
+##                                                      ##
+## https://github.com/codewmax/chrome-dinosaur          ##
+##                                                      ##
+##########################################################
+
 import pygame
 import os
 import random
@@ -99,11 +106,11 @@ class Dinosaur:
         if self.step_index >= 10:
             self.step_index = 0
 
-        if (action==1 or userInput[pygame.K_UP]) and not self.dino_jump:
+        if (action==2 or userInput[pygame.K_UP]) and not self.dino_jump:
             self.dino_duck = False
             self.dino_run = False
             self.dino_jump = True
-        elif (action==0 or userInput[pygame.K_DOWN]) and not self.dino_jump:
+        elif (action==1 or userInput[pygame.K_DOWN]) and not self.dino_jump:
             self.dino_duck = True
             self.dino_run = False
             self.dino_jump = False
@@ -182,21 +189,24 @@ class SmallCactus(Obstacle):
         self.type = random.randint(0, 2)
         super().__init__(image, self.type)
         self.rect.y = 325
+        self.the_type = 3
 
 
 class LargeCactus(Obstacle):
     def __init__(self, image):
         self.type = random.randint(0, 2)
         super().__init__(image, self.type)
-        self.rect.y = 300
+        self.rect.y = 330
+        self.the_type = 2
 
 
 class Bird(Obstacle):
     def __init__(self, image):
         self.type = 0
         super().__init__(image, self.type)
-        self.rect.y = np.random.choice([200, 250])
+        self.rect.y = np.random.choice([220, 240, 200])
         self.index = 0
+        self.the_type = 1
 
     def draw(self, SCREEN):
         if self.index >= 9:
@@ -209,11 +219,11 @@ def sample_action(env, dyno, random_action):
     if not random_action:
         model = dyno.ANN
         
-        state = np.zeros(env.shape[0])
-        state    = env
+        state    = env.copy()
         state[0] = dyno.dino_duck
         state[1] = dyno.dino_run
         state[2] = dyno.dino_jump
+        state[5] = dyno.dino_rect.y - state[5]
         
         action = np.argmax(model.forward(state))
     else:
@@ -225,7 +235,7 @@ def main(players, training=True, random_actions=False):
     
     global game_speed, x_pos_bg, y_pos_bg, points, obstacles, generations, action_map, state_dim, alive
     
-    environment = np.zeros(state_dim, dtype=np.int16)
+    environment = np.zeros(state_dim, dtype=np.float16)
     run = True
     clock = pygame.time.Clock()
     
@@ -253,7 +263,7 @@ def main(players, training=True, random_actions=False):
         text = font.render("Points: " + str(points) + " alive: " + str(alive) + " Generation: " + str(generations), True, (0, 0, 0))
 
         textRect = text.get_rect()
-        textRect.center = (900, 40)
+        textRect.center = (500, 440)
         
         SCREEN.blit(text, textRect)
 
@@ -279,15 +289,16 @@ def main(players, training=True, random_actions=False):
                 run = False
 
         if len(obstacles) == 0:
-            if random.randint(0, 2) == 0:
+            key = int(random.randint(0,3))
+            if key == 0:
                 obstacles.append(SmallCactus(SMALL_CACTUS))
-            elif random.randint(0, 2) == 1:
+            elif key == 1:
                 obstacles.append(LargeCactus(LARGE_CACTUS))
-            elif random.randint(0, 2) == 2:
+            elif key == 2:
                 obstacles.append(Bird(BIRD))
     
         i = 0
-        environment = np.zeros(state_dim, dtype=np.int16)
+        environment = np.zeros(state_dim, dtype=np.float16)
         SCREEN.fill((255, 255, 255))
         for obstacle in obstacles:
             obstacle.draw(SCREEN)
@@ -306,11 +317,11 @@ def main(players, training=True, random_actions=False):
                     alive+=1
 
         if len(obstacles)>0:
-            environment[3] = obstacles[0].rect.x
-            environment[4] = obstacles[0].rect.y
-            #environment[5] = obstacles[0].rect.h #game_speed
-            #environment[6] = obstacles[0].rect.w
-            environment[7] = obstacles[0].type
+            environment[3] = obstacles[0].the_type
+            environment[4] = obstacles[0].rect.x
+            environment[5] = obstacles[0].rect.y
+            #environment[6] = np.log(obstacles[0].rect.w+0.1)
+            #environment[7] = obstacles[0].rect.y
 
         for player in players:
             if player.alive:
@@ -374,29 +385,36 @@ def performCrossing(father, mother,  mutation_rate=0.1):
     size = father.shape[0]
     new_individual = np.zeros(size)
     
-    inherit_prob = 0.5
+    inherit_prob = 0.55
     for i in range(size):
         if np.random.random()<inherit_prob:
             new_individual[i] = father[i]
         else:
-            new_individual[i] = mother[i]        
-        if np.random.random() < mutation_rate:
-            new_individual[i]*=np.random.rand() * 0.1
+            new_individual[i] = mother[i]
+            
+    if np.random.random() < mutation_rate:
+        a = np.random.randint(size)
+        b = np.random.randint(size)
+        for i in range(min(a,b), max(a,b)):
+            gene = np.random.randint(size)
+            new_individual[gene]*=np.random.rand() * 0.10
             
     return new_individual
 
-def perform_Crossing(father, mother,  mutation_rate=0.07):
+def perform_Crossing(father, mother,  mutation_rate=0.1):
         """ CROSS TWO INDIVIDUALS WITH CROSS OVER STRATEGY, PERFORM MUTATION WHILE CROSSING """
 
         size = father.shape[0]
-        new_individual = np.zeros(size)
         midPoint = np.random.randint(0, size)
-        for ix in range(size):
-            if np.random.random(1)[0] < mutation_rate:
-                new_individual[ix] = np.random.randint(1, size=(size))[0]
-            else:
-                new_individual[ix] = father[ix] if ix < midPoint else mother[ix]
+        new_individual = father.copy()
 
+        muts = 0
+        for ix in range(size):
+            mute = np.random.random()
+            new_individual[ix] = father[ix] if ix < midPoint else mother[ix]
+            if mute < mutation_rate:
+                new_individual[ix] = new_individual[ix] * np.random.randint(1, size=(size))[0]
+                muts+=1
         return new_individual
         
 def evolve(players, evolution_pool, num_parents=4, mutation_rate=0.1):
@@ -412,6 +430,7 @@ def evolve(players, evolution_pool, num_parents=4, mutation_rate=0.1):
     mother = players[parents[-2]].ANN.get_params()
         
     print(rewards[parents[-1]], rewards[parents[-2]])
+    
     for p in players:
         """
         the_father, the_mother = random.sample(list(parents), k=2)
@@ -427,14 +446,16 @@ training = True
 state_dim   = 8
 generations = 0
 num_players = 50
+
+np.random.default_rng()
 D           = state_dim
-M1          = 64
-M2          = 16
+M1          = 132
+M2          = 64
 K           = 3
 action_max  = 2
 
-num_parents = 2
-lr = 0.05
+num_parents = 4
+lr = 0.1
 
 evolution_pool = [[0, 0], [0, 0]]
 
@@ -450,12 +471,15 @@ while training:
     generations += 1
     menu(death_count=0, players=players, random_actions=False, training=True)
     players = evolve(players, evolution_pool, num_parents=num_parents, mutation_rate=lr)
-    lr*=0.995
-    if lr<0.001:
-        lr = 0.001
+    lr*=0.991
+    if lr<0.0001:
+        lr = 0.0001
     alive = 0
+    model = np.zeros((num_players, nn.get_params().shape[0]))
     for p in players:
+        model[alive] = p.ANN.get_params()
         p.alive = True
         p.points = 0
         alive+=1
+    np.save("models/gen_"+str(generations), model)
     print(action_map, lr)
