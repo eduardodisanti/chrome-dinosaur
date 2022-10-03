@@ -19,19 +19,46 @@ JUMPING = pygame.image.load(os.path.join("Assets/Dino", "DinoJump.png"))
 DUCKING = [pygame.image.load(os.path.join("Assets/Dino", "DinoDuck1.png")),
            pygame.image.load(os.path.join("Assets/Dino", "DinoDuck2.png"))]
 
-SMALL_CACTUS = [pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus1.png")),
-                pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus2.png")),
-                pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus3.png"))]
+RUNNING = [pygame.image.load(os.path.join("Assets/snowboarder", "snowboarder_run1.png")),
+           pygame.image.load(os.path.join("Assets/snowboarder", "snowboarder_run2.png"))]
+
+JUMPING = pygame.image.load(os.path.join("Assets/Dino", "DinoJump.png"))
+JUMPING = pygame.image.load(os.path.join("Assets/snowboarder", "snowboarder_jump1.png"))
+
+DUCKING = [pygame.image.load(os.path.join("Assets/Dino", "DinoDuck1.png")),
+           pygame.image.load(os.path.join("Assets/Dino", "DinoDuck2.png"))]
+
+DUCKING = [pygame.image.load(os.path.join("Assets/snowboarder", "snowboarder_duck1.png")),
+           pygame.image.load(os.path.join("Assets/snowboarder", "snowboarder_duck2.png"))]
+
+
+SMALL_CACTUS = [pygame.image.load(os.path.join("Assets/bush", "bush_1.png")),
+                pygame.image.load(os.path.join("Assets/bush", "bush_2.png")),
+                pygame.image.load(os.path.join("Assets/bush", "bush_3.png"))]
+
+SMALL_CACTUS = [pygame.image.load(os.path.join("Assets/skier", "post_1.png")),
+                pygame.image.load(os.path.join("Assets/skier", "post_2.png")),
+                pygame.image.load(os.path.join("Assets/skier", "post_3.png"))]
+
 LARGE_CACTUS = [pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus1.png")),
                 pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus2.png")),
                 pygame.image.load(os.path.join("Assets/Cactus", "LargeCactus3.png"))]
 
+LARGE_CACTUS = [pygame.image.load(os.path.join("Assets/plown", "plown_1.png")),
+                pygame.image.load(os.path.join("Assets/plown", "plown_2.png")),
+                pygame.image.load(os.path.join("Assets/plown", "plown_3.png"))]
+
+
 BIRD = [pygame.image.load(os.path.join("Assets/Bird", "Bird1.png")),
         pygame.image.load(os.path.join("Assets/Bird", "Bird2.png"))]
 
-CLOUD = pygame.image.load(os.path.join("Assets/Other", "Cloud.png"))
+BIRD = [pygame.image.load(os.path.join("Assets/helicopter", "helicopter_1.png")),
+        pygame.image.load(os.path.join("Assets/helicopter", "helicopter_2.png"))]
+
+CLOUD = pygame.image.load(os.path.join("Assets/Other", "cloud_snowing.png"))
 
 BG = pygame.image.load(os.path.join("Assets/Other", "Track.png"))
+UBG = pygame.image.load(os.path.join("Assets/Other", "track_2.png"))
 
 
 class Dinosaur:
@@ -233,10 +260,15 @@ def main(players, training=True, random_actions=False):
     def background():
         global x_pos_bg, y_pos_bg
         image_width = BG.get_width()
+        image_height = UBG.get_height()
+        ub_image_width = UBG.get_width()
+        SCREEN.blit(UBG, (x_pos_bg, y_pos_bg - image_height))
+        SCREEN.blit(UBG, (ub_image_width + x_pos_bg, y_pos_bg - image_height))
         SCREEN.blit(BG, (x_pos_bg, y_pos_bg))
         SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
         if x_pos_bg <= -image_width:
             SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
+            SCREEN.blit(UBG, (ub_image_width + x_pos_bg, y_pos_bg - image_height))
             x_pos_bg = 0
         x_pos_bg -= game_speed
 
@@ -246,7 +278,7 @@ def main(players, training=True, random_actions=False):
             if event.type == pygame.QUIT:
                 run = False
 
-        if len(obstacles) == 0: # or len(obstacles) > 0 and len(obstacles) < 2 and np.random.randint(10) < 2
+        if len(obstacles) == 0:
             if random.randint(0, 2) == 0:
                 obstacles.append(SmallCactus(SMALL_CACTUS))
             elif random.randint(0, 2) == 1:
@@ -312,10 +344,6 @@ def main(players, training=True, random_actions=False):
         pygame.display.update()
 
 def menu(death_count, players, training=True, random_actions=False):
-    #global points, generations
-
-    #run = True
-    #while run:
         SCREEN.fill((255, 255, 255))
         font = pygame.font.Font('freesansbold.ttf', 30)
 
@@ -377,18 +405,12 @@ def evolve(players, evolution_pool, num_parents=4, mutation_rate=0.1):
     
     for p in players:
         rewards.append(p.points)
-    
-    father_reward, last_father = evolution_pool[0]
-    mother_reward, last_mother = evolution_pool[1]
-    
+        
     parents = np.argsort(rewards)[-num_parents:]
     
     father = players[parents[-1]].ANN.get_params()
     mother = players[parents[-2]].ANN.get_params()
-    
-    
-    #if best_genes[-1] > sorted(rewards)
-    
+        
     print(rewards[parents[-1]], rewards[parents[-2]])
     for p in players:
         """
@@ -428,9 +450,9 @@ while training:
     generations += 1
     menu(death_count=0, players=players, random_actions=False, training=True)
     players = evolve(players, evolution_pool, num_parents=num_parents, mutation_rate=lr)
-    lr*=0.91
-    if lr<0.01:
-        lr = 0.01
+    lr*=0.995
+    if lr<0.001:
+        lr = 0.001
     alive = 0
     for p in players:
         p.alive = True
