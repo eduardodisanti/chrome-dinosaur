@@ -442,12 +442,16 @@ def evolve(players, evolution_pool, num_parents=4, mutation_rate=0.1):
     
     return players
 
+def load_generation(num):
+    
+    nn = np.load("models/gen_"+str(num)+".npy")
+    return nn
+
 training = True
 state_dim   = 8
-generations = 0
-num_players = 50
 
-np.random.default_rng()
+num_players = 50
+   
 D           = state_dim
 M1          = 132
 M2          = 64
@@ -457,15 +461,32 @@ action_max  = 2
 num_parents = 4
 lr = 0.1
 
+cold_start = False
+generations = 178
+
+if cold_start:
+    generations = 0
+    np.random.default_rng()
+    lr = 0.1
+else:
+    lr = 0.0001
+
 evolution_pool = [[0, 0], [0, 0]]
 
+if not cold_start:
+    bigNN = load_generation(generations)
+
 players = []
-for _ in range(num_players):
+for i in range(num_players):
     d = Dinosaur()
     nn = ANN2(D, M1, M2, K, action_max)
-    nn.init()
+    if cold_start:
+        nn.init()
+    else:
+        nn.set_params(bigNN[i])
     d.set_ANN(nn)
     players.append(d)
+
 while training:
     action_map = {0:0, 1:0, 2:0}
     generations += 1
@@ -481,5 +502,5 @@ while training:
         p.alive = True
         p.points = 0
         alive+=1
-    np.save("models/gen_"+str(generations), model)
+    #np.save("models/gen_"+str(generations), model)
     print(action_map, lr)
